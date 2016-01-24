@@ -1,0 +1,7 @@
+sprocket.prg
+=
+pcstart.o
+* (sprocket.h)
+pcstdlib.lib
+pcextlib.lib
+pctoslib.lib
