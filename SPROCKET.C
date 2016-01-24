@@ -8,6 +8,7 @@ int main(int argc, char ** argv)
 {
 	int i;
 	char mode;
+	char origin;
 	char input[128];
 	char outfile[128];
 	char infile[128];
@@ -38,8 +39,21 @@ int main(int argc, char ** argv)
 		getchar();
 		return 0;
 	}
-	
-	if(mode == '2')
+
+	if(mode == '1')
+	{
+		sprintf(outfile, "%s_r.bin", input);
+
+		dest = fopen(outfile, "wb");
+
+		if(!dest)
+		{
+			printf("Could not open file for output: %s", outfile);
+			getchar();
+			return 0;
+		}
+	}	
+	else if(mode == '2')
 	{
 		printf("Enter the name of the file to create:\n");
 		scanf("%s", outfile);
@@ -52,17 +66,22 @@ int main(int argc, char ** argv)
 			getchar();
 			return 0;
 		}
+
+		printf("Top left origin (1) or centered (2)?\n");
+		origin = getMode();
+
 	}
 	
 	if(mode == '1')
 		reverseFile(source, dest);
 	else if(mode == '2')
-		bin2asm(input, source, dest);
+		bin2asm(input, source, dest, origin);
 		
 	fclose(source);
 	fclose(dest);
 	
 	printf("\n\nDone. Hit enter to exit.\n");
+	getchar();
 	getchar();
 	
 	return 0;
@@ -100,35 +119,36 @@ void reverseFile(FILE * source, FILE * dest)
 	}
 }
 
-void bin2asm(char * name, FILE * source, FILE * dest)
+void bin2asm(char * name, FILE * source, FILE * dest, char origin)
 {
 	printf("Writing sprite routine...\n");
- 	writeSprite(name, source, dest, 0);
+ 	writeSprite(name, source, dest, origin, 0);
  	
  	printf("Writing sprite clear routine...\n");
  	fseek(source, 0, SEEK_SET);
- 	writeSprite(name, source, dest, 1);
+ 	writeSprite(name, source, dest, origin, 1);
 }
 
-void writeSprite(char * name, FILE * source, FILE * dest, int clear)
+void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear)
 {
-	unsigned int pixel;
+	unsigned short int pixel = 0;
 	int working = 1;
 	int clearCount = 0;
 	int count = 0;
 	int totalCount = 0;
 	int lineOffset = 0;
+	int spriteCount = 0;
 		
 	/* skip the sprite mask 
 	fseek(source, 16*16*2, SEEK_SET);*/
 	
 	if(clear)
 	{
-		fprintf(dest, "\t\tsection text\r\n%sclear:\r\n", name);
+		fprintf(dest, "\t\tsection text\r\n%s%iclear:\r\n", name, spriteCount);
 	}
 	else
 	{
-		fprintf(dest, "\t\tsection text\r\n%s:\r\n", name);
+		fprintf(dest, "\t\tsection text\r\n%s%i:\r\n", name, spriteCount);
 	}
 	 	
 	while(working)
@@ -137,9 +157,27 @@ void writeSprite(char * name, FILE * source, FILE * dest, int clear)
 		count ++;
 		totalCount++;
 		
-		if(!working || totalCount == 16*16)
+		if(!working)
 		{
 			break;
+		}
+
+		if(totalCount > 16*16)
+		{
+			fprintf(dest, "\t\trts\r\n\r\n");
+
+			if(clear)
+			{
+				fprintf(dest, "\t\tsection text\r\n%s%iclear:\r\n", name, ++spriteCount);
+			}
+			else
+			{
+				fprintf(dest, "\t\tsection text\r\n%s%i:\r\n", name, ++spriteCount);
+			}
+
+			totalCount = 0;
+			clearCount = 0;
+			lineOffset = 0;
 		}
 		
 		if(pixel)
