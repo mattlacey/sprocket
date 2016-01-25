@@ -137,6 +137,8 @@ void bin2asm(char * name, FILE * source, FILE * dest, char origin)
 void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear)
 {
 	unsigned short int pixel = 0;
+	unsigned short int pixel2 = 0;
+
 	int working = 1;
 	int clearCount = 0;
 	int count = 0;
@@ -159,15 +161,25 @@ void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear
 	while(working)
 	{			
 		working = fread(&pixel, 1, 2, source);
-		count ++;
-		totalCount++;
+		working |= fread(&pixel2, 1, 2, source);
+
+		count += 2;
+		totalCount += 2;
 		
 		if(!working)
 		{
 			break;
 		}
 		
-		if(pixel)
+		// if the first pixel is blank we need to allow for that
+		if(!pixel && pixel2)
+		{
+			clearCount++;
+		}
+
+		// if there's a value in one and we were previously processing blank pixels then 
+		// offset the memory address accordingly
+		if(pixel || pixel2)
 		{
 			if(clearCount)
 			{
@@ -199,19 +211,38 @@ void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear
 				if(DEBUG)
 					fprintf(dest, "; reset offset\r\n");
 			}
+		}
 
+		if(pixel && pixel2)
+		{
+			if(clear)
+			{
+				fprintf(dest, "\t\tmove.l\t(a1)+,(a0)+\r\n");			
+			}
+			else
+			{
+				fprintf(dest, "\t\tmove.l\t#$%04X%04X,(a0)+\r\n", pixel, pixel2);
+			}
+		}
+		else if(pixel || pixel2)
+		{
 			if(clear)
 			{
 				fprintf(dest, "\t\tmove.w\t(a1)+,(a0)+\r\n");			
 			}
 			else
 			{
-				fprintf(dest, "\t\tmove.w\t#$%04X,(a0)+\r\n", pixel);
+				fprintf(dest, "\t\tmove.w\t#$%04X,(a0)+\r\n", pixel | pixel2);
+			}
+
+			if(pixel)
+			{
+				clearCount ++;
 			}
 		}
 		else
 		{
-			clearCount ++;
+			clearCount += 2;
 		}
 			
 		if(count == 16)
