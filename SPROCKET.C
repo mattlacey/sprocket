@@ -15,70 +15,75 @@ int main(int argc, char ** argv)
 	FILE * source;
 	FILE * dest;
 	
-	for(i = 0; i < 32; i++)
+	for(i = 0; i < 25; i++)
 		printf("\n");
-		
-	printf("Welcome to Sprocket.\nWhat do you want to do?\n\n\t1. Reverse File\n\t2. Binary to ASM\n\t9. Quit\n\n");
 
-	mode = getMode();
+	printf("Welcome to Sprocket\n-------------------\n\n");
 
-	if(mode == '9')
-	{
-		return 0;
-	}
+	while(1)
+	{		
+		printf("What do you want to do?\n\n\t1. Reverse File\n\t2. Binary to ASM\n\t9. Quit\n\n");
 
-	printf("Enter the name of the file to process (.bin):\n");
-	scanf("%s", input);
-	sprintf(infile, "%s.bin", input);
-	
-	source = fopen(infile, "rb");
-	
-	if(!source)
-	{
-		printf("Could not open file: %s", input[1]);
-		getchar();
-		return 0;
-	}
+		mode = getMode();
 
-	if(mode == '1')
-	{
-		sprintf(outfile, "%s_r.bin", input);
-
-		dest = fopen(outfile, "wb");
-
-		if(!dest)
+		if(mode == '9')
 		{
-			printf("Could not open file for output: %s", outfile);
-			getchar();
-			return 0;
+			break;
 		}
-	}	
-	else if(mode == '2')
-	{
-		printf("Enter the name of the file to create:\n");
-		scanf("%s", outfile);
+
+		printf("Enter the name of the file to process (.bin):\n");
+		scanf("%s", input);
+		sprintf(infile, "%s.bin", input);
 		
-		dest = fopen(outfile, "wb");
-	
-		if(!dest)
+		source = fopen(infile, "rb");
+		
+		if(!source)
 		{
-			printf("Could not open file for output: %s", outfile);
+			printf("Could not open file: %s", input[1]);
 			getchar();
 			return 0;
 		}
 
-		printf("Top left origin (1) or centered (2)?\n");
-		origin = getMode();
+		if(mode == '1')
+		{
+			sprintf(outfile, "%s_r.bin", input);
 
-	}
-	
-	if(mode == '1')
-		reverseFile(source, dest);
-	else if(mode == '2')
-		bin2asm(input, source, dest, origin);
+			dest = fopen(outfile, "wb");
+
+			if(!dest)
+			{
+				printf("Could not open file for output: %s", outfile);
+				getchar();
+				return 0;
+			}
+		}	
+		else if(mode == '2')
+		{
+			printf("Enter the name of the file to create:\n");
+			scanf("%s", outfile);
+			
+			dest = fopen(outfile, "wb");
 		
-	fclose(source);
-	fclose(dest);
+			if(!dest)
+			{
+				printf("Could not open file for output: %s", outfile);
+				getchar();
+				return 0;
+			}
+
+			printf("Top left origin (1) or centered (2)?\n");
+			origin = getMode();
+		}
+
+		
+		if(mode == '1')
+			reverseFile(source, dest);
+		else if(mode == '2')
+			bin2asm(input, source, dest, origin);
+			
+		fclose(source);
+		fclose(dest);
+	}
 	
 	printf("\n\nDone. Hit enter to exit.\n");
 	getchar();
@@ -161,24 +166,6 @@ void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear
 		{
 			break;
 		}
-
-		if(totalCount > 16*16)
-		{
-			fprintf(dest, "\t\trts\r\n\r\n");
-
-			if(clear)
-			{
-				fprintf(dest, "\t\tsection text\r\n%s%iclear:\r\n", name, ++spriteCount);
-			}
-			else
-			{
-				fprintf(dest, "\t\tsection text\r\n%s%i:\r\n", name, ++spriteCount);
-			}
-
-			totalCount = 0;
-			clearCount = 0;
-			lineOffset = 0;
-		}
 		
 		if(pixel)
 		{
@@ -231,9 +218,28 @@ void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear
 		{
 			count = 0;
 			lineOffset ++;
-			
+		
 			if(DEBUG)
 				fprintf(dest, "; set offset\r\n");
+		}
+
+		if(totalCount == 16*16)
+		{
+			fprintf(dest, "\t\trts\r\n\r\n");
+
+			if(clear)
+			{
+				fprintf(dest, "\t\tsection text\r\n%s%iclear:\r\n", name, ++spriteCount);
+			}
+			else
+			{
+				fprintf(dest, "\t\tsection text\r\n%s%i:\r\n", name, ++spriteCount);
+			}
+
+			totalCount = 0;
+			clearCount = 0;
+			lineOffset = 0;
+			count = 0;
 		}
 	}
 	
