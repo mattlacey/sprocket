@@ -7,8 +7,10 @@
 int main(int argc, char ** argv)
 {
 	int i;
+	int lineLength;
+	int width;
 	char mode;
-	char origin;
+	char origin = 0;
 	char input[128];
 	char outfile[128];
 	char infile[128];
@@ -22,7 +24,7 @@ int main(int argc, char ** argv)
 
 	while(1)
 	{		
-		printf("What do you want to do?\n\n\t1. Reverse File\n\t2. Binary to ASM\n\t9. Quit\n\n");
+		printf("What do you want to do?\n\n\t1. Bitmap to Binary\n\t2. Binary to ASM (Sprites)\n\t3. Binary to ASM (BG)\n\t9. Quit\n\n");
 
 		mode = getMode();
 
@@ -31,9 +33,18 @@ int main(int argc, char ** argv)
 			break;
 		}
 
-		printf("Enter the name of the file to process (.bin):\n");
-		scanf("%s", input);
-		sprintf(infile, "%s.bin", input);
+		if(mode == '1')
+		{
+			printf("Enter the name of the file to convert (.bmp):\n");
+			scanf("%s", input);
+			sprintf(infile, "%s.bmp", input);
+		}
+		else
+		{
+			printf("Enter the name of the file to process (.bin):\n");
+			scanf("%s", input);
+			sprintf(infile, "%s.bin", input);
+		}
 		
 		source = fopen(infile, "rb");
 		
@@ -46,40 +57,41 @@ int main(int argc, char ** argv)
 
 		if(mode == '1')
 		{
-			sprintf(outfile, "%s_r.bin", input);
+			printf("Enter image width in bytes:\n");
+			scanf("%i", &width);
 
-			dest = fopen(outfile, "wb");
+			sprintf(outfile, "%s.bin", input);
 
-			if(!dest)
+			if(!openFile(&dest, outfile))
 			{
-				printf("Could not open file for output: %s", outfile);
-				getchar();
 				return 0;
 			}
 		}	
-		else if(mode == '2')
+		else if(mode == '2' || mode == '3' || mode == '4')
 		{
 			printf("Enter the name of the file to create:\n");
 			scanf("%s", outfile);
 			
-			dest = fopen(outfile, "wb");
-		
-			if(!dest)
+			if(!openFile(&dest, outfile))
 			{
-				printf("Could not open file for output: %s", outfile);
-				getchar();
 				return 0;
 			}
 
-			printf("Top left origin (1) or centered (2)?\n");
-			origin = getMode();
+			/*
+			if(mode == '2')
+			{
+				printf("Top left origin (1) or centered (2)?\n");
+				origin = getMode();
+			*/
 		}
 
 		
 		if(mode == '1')
-			reverseFile(source, dest);
+			bmp2bin(source, dest, width);
 		else if(mode == '2')
-			bin2asm(input, source, dest, origin);
+			bin2asmSprite(input, source, dest, origin);
+		else if(mode == '3')
+			bin2asmBG(input, source, dest);
 			
 		fclose(source);
 		fclose(dest);
@@ -90,6 +102,20 @@ int main(int argc, char ** argv)
 	getchar();
 	
 	return 0;
+}
+
+int openFile(FILE ** ppFile, char * filename)
+{
+	*ppFile = fopen(filename, "wb");
+		
+	if(!*ppFile)
+	{
+		printf("Could not open file for output: %s", filename);
+		getchar();
+		return 0;
+	}
+
+	return 1;
 }
 
 char getMode(void)
@@ -104,27 +130,39 @@ char getMode(void)
 	return mode;
 }
 
-void reverseFile(FILE * source, FILE * dest)
+void bmp2bin(FILE * source, FILE * dest, int width)
 {
-	long location;
-	char byte;
+	long lines;
+	char bytes[2];
 	
-	fseek(source, -1, SEEK_END);
+	fseek(source, 0, SEEK_END);
 	
 	/* want to include the last byte! */
-	location = 1 + ftell(source);
-	
-	while(location)
-	{
-		byte = fgetc(source);
-		fputc(byte, dest);
+	lines = (ftell(source) - 138) / width;
 
-		fseek(source, -2, SEEK_CUR);
-		location--;
+
+	/* Header is 138 bytes, want that to be cut off */
+	while(lines)
+	{
+		fseek(source, - width, SEEK_CUR);
+
+		int j = width;
+
+		while(j)
+		{
+			bytes[0] = fgetc(source);
+			bytes[1] = fgetc(source);
+			fputc(bytes[1], dest);
+			fputc(bytes[0], dest);
+			j -= 2;
+		}
+
+		lines --;
+		fseek(source, - width, SEEK_CUR);
 	}
 }
 
-void bin2asm(char * name, FILE * source, FILE * dest, char origin)
+void bin2asmSprite(char * name, FILE * source, FILE * dest, char origin)
 {
 	printf("Writing sprite routine...\n");
  	writeSprite(name, source, dest, origin, 0);
@@ -272,6 +310,29 @@ void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear
 			lineOffset = 0;
 			count = 0;
 		}
+	}
+	
+	fprintf(dest, "\t\trts\r\n\r\n");
+}
+
+void bin2asmBG(char * name, FILE * source, FILE * dest)
+{
+	unsigned int pixels = 0;
+
+	int working = 1;
+	
+	fprintf(dest, "\t\tsection text\r\nBG_%s:\r\n", name);
+		 	
+	while(working)
+	{			
+		working = fread(&pixels, 1, 4, source);
+
+		if(!working)
+		{
+			break;
+		}
+		
+		fprintf(dest, "\t\tmove.l\t#$%08X,(a0)+\r\n", pixels);
 	}
 	
 	fprintf(dest, "\t\trts\r\n\r\n");
