@@ -97,10 +97,6 @@ int main(int argc, char ** argv)
 		fclose(dest);
 	}
 	
-	printf("\n\nDone. Hit enter to exit.\n");
-	getchar();
-	getchar();
-	
 	return 0;
 }
 
@@ -187,27 +183,31 @@ void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear
 	/* skip the sprite mask 
 	fseek(source, 16*16*2, SEEK_SET);*/
 	
-	if(clear)
-	{
-		fprintf(dest, "\t\tsection text\r\n%s%iclear:\r\n", name, spriteCount);
-	}
-	else
-	{
-		fprintf(dest, "\t\tsection text\r\n%s%i:\r\n", name, spriteCount);
-	}
-	 	
 	while(working)
-	{			
+	{
 		working = fread(&pixel, 1, 2, source);
 		working |= fread(&pixel2, 1, 2, source);
 
-		count += 2;
-		totalCount += 2;
-		
 		if(!working)
 		{
 			break;
 		}
+
+		if(!totalCount)
+		{	
+			if(clear)
+			{
+				fprintf(dest, "\t\tsection text\r\n%s%iclear:\r\n", name, spriteCount++);
+			}
+			else
+			{
+				fprintf(dest, "\t\tsection text\r\n%s%i:\r\n", name, spriteCount++);
+			}
+		}
+
+		count += 2;
+		totalCount += 2;
+		
 		
 		// if the first pixel is blank we need to allow for that
 		if(!pixel && pixel2)
@@ -296,23 +296,20 @@ void writeSprite(char * name, FILE * source, FILE * dest, char origin, int clear
 		{
 			fprintf(dest, "\t\trts\r\n\r\n");
 
-			if(clear)
-			{
-				fprintf(dest, "\t\tsection text\r\n%s%iclear:\r\n", name, ++spriteCount);
-			}
-			else
-			{
-				fprintf(dest, "\t\tsection text\r\n%s%i:\r\n", name, ++spriteCount);
-			}
-
 			totalCount = 0;
 			clearCount = 0;
 			lineOffset = 0;
 			count = 0;
 		}
 	}
-	
-	fprintf(dest, "\t\trts\r\n\r\n");
+
+	fprintf(dest, "%s%s_map:\tdc.l\t", name, clear ? "clear" : "");
+
+	for(count = 0; count < spriteCount; count++)
+	{
+		fprintf(dest, "%s%i", name, count);
+		fprintf(dest, count == spriteCount - 1 ? "\r\n\r\n" : ",");
+	}
 }
 
 void bin2asmBG(char * name, FILE * source, FILE * dest)
